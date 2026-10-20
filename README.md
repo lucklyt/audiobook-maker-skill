@@ -27,7 +27,9 @@
 audiobook-maker/
 ├── SKILL.md                          # Agent 技能定义文件与操作指引
 ├── scripts/
-│   └── make_audiobook.py             # 核心跨平台打包脚本（纯 Python 3 标准库）
+│   ├── make_audiobook.py             # 核心跨平台打包脚本（纯 Python 3 标准库）
+│   ├── make_audiobook.sh             # macOS / Linux 纯 Bash 脚本（零 Python 依赖）
+│   └── make_audiobook.ps1            # Windows 纯 PowerShell 脚本（零 Python 依赖）
 └── references/
     └── apple_m4b_spec.md             # Apple Books / M4B 规范技术参考
 ```

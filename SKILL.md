@@ -17,8 +17,44 @@ metadata:
 
 ## 🛠️ 核心工具脚本
 
-Skill 内置了全自动制作脚本：
-`$SKILL_DIR/scripts/make_audiobook.py`
+Skill 提供了**双轨驱动**，即使本机**完全未安装 Python**，也提供零依赖原生脚本支持：
+
+| 运行环境 | 工具脚本 | 运行依赖 |
+| :--- | :--- | :--- |
+| **通用（推荐）** | `$SKILL_DIR/scripts/make_audiobook.py` | Python 3.8+ (标准库) + FFmpeg |
+| **macOS / Linux（无 Python）** | `$SKILL_DIR/scripts/make_audiobook.sh` | Bash / Sh + FFmpeg (零 Python 依赖) |
+| **Windows（无 Python）** | `$SKILL_DIR/scripts/make_audiobook.ps1` | PowerShell + FFmpeg (零 Python 依赖) |
+| **Agent 原生直接执行** | Agent 生成 `metadata.txt` 并直调 FFmpeg | 仅需 FFmpeg |
+
+---
+
+## 💡 若本机未安装 Python 的应对方案
+
+当 Agent 探测到系统中没有 Python（`which python3` 返回空）时，可按以下优先级自动选择：
+
+### 方案 A：直接运行纯 Shell / PowerShell 原生脚本（零门槛首选）
+* **macOS / Linux**：
+  ```bash
+  bash "$SKILL_DIR/scripts/make_audiobook.sh" \
+    -i "/path/to/audios" \
+    -o "/path/to/书名.m4b" \
+    -t "书名" -a "作者" -c "/path/to/cover.jpg"
+  ```
+* **Windows (PowerShell)**：
+  ```powershell
+  & "$SKILL_DIR\scripts\make_audiobook.ps1" `
+    -InputDir "C:\audios" `
+    -OutputFile "C:\audios\书名.m4b" `
+    -Title "书名" -Author "作者"
+  ```
+
+### 方案 B：由 Agent 自动一键安装 Python
+* **Windows**：直接运行 `winget install Python.Python.3.12 --silent`。
+* **macOS**：运行 `brew install python`。
+* **Linux**：运行 `sudo apt-get install -y python3`。
+
+### 方案 C：Agent 纯原生管道拼装
+Agent 自行计算音频分集时长，生成 `concat.txt` 和 `metadata.txt`，随后单条 `ffmpeg` 命令完成封装，全程无需运行任何外部脚本。
 
 ### 跨平台与自动依赖管理特性
 - **支持全平台**：无缝支持 **Windows 10/11**、**macOS (Intel/Apple Silicon)** 以及主流 **Linux** 发行版。
