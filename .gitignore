@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Audio / media files
+*.mp3
+*.m4a
+*.m4b
+*.wav
+*.flac
+*.aac
+*.ogg
+
+# Temporary directories
+tmp/
+temp/
+*.tmp
+
+# OS specific
+.DS_Store
+Thumbs.db
