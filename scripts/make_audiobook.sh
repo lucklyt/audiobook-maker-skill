@@ -32,9 +32,12 @@ usage() {
     echo "  -p, --publisher    出品/出版机构"
     echo "  -s, --summary      内容简介"
     echo "  -b, --bitrate      音频码率 (默认: 96k)"
+    echo "  --strip-chapter-prefix  剥离第x集/Chapter x等章节标识，仅保留纯章节名"
     echo "  -h, --help         显示帮助信息"
     exit 1
 }
+
+STRIP_CHAPTER_PREFIX=0
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -49,6 +52,7 @@ while [[ $# -gt 0 ]]; do
         -p|--publisher) PUBLISHER="$2"; shift 2 ;;
         -s|--summary) SUMMARY="$2"; shift 2 ;;
         -b|--bitrate) BITRATE="$2"; shift 2 ;;
+        --strip-chapter-prefix) STRIP_CHAPTER_PREFIX=1; shift ;;
         -h|--help) usage ;;
         *) echo "[错误] 未知参数: $1"; usage ;;
     esac
@@ -145,9 +149,24 @@ INDEX=1
 
 for FILE in "${FILES[@]}"; do
     BASENAME=$(basename "$FILE")
-    # Clean chapter title
-    CH_TITLE=$(echo "$BASENAME" | sed -E 's/\.[^.]+$//' | sed -E 's/^[0-9]+[ ._:-]+//')
-    [[ -z "$CH_TITLE" ]] && CH_TITLE="$BASENAME"
+    NAME="${BASENAME%.*}"
+
+    # 1. Check if leading file sequence number precedes a chapter indicator (e.g. 10.第5集, 10第5集, 01 Chapter 1)
+    CH_TITLE=$(echo "$NAME" | sed -E 's/^[[:space:]]*[0-9]+[[:space:]_.:-]*((第[0-9一二三四五六七八九十百千万零两]+[集章节卷部篇回话节讲期]|Chapter|Episode|Part|Section)[[:space:]_.:-]*.*)/\1/I')
+    if [[ "$CH_TITLE" == "$NAME" ]]; then
+        # Standard cleaning: strip leading sequence number with delimiter
+        CH_TITLE=$(echo "$NAME" | sed -E 's/^[[:space:]]*[0-9]+[[:space:]_.:-]+//')
+    fi
+
+    # 2. Optionally strip chapter prefix
+    if [[ "$STRIP_CHAPTER_PREFIX" -eq 1 ]]; then
+        CH_TITLE=$(echo "$CH_TITLE" | sed -E 's/^(第[0-9一二三四五六七八九十百千万零两]+[集章节卷部篇回话节讲期]|Chapter[[:space:]]*[0-9ivxlcdm]+|Episode[[:space:]]*[0-9]+|Part[[:space:]]*[0-9ivxlcdm]+|Section[[:space:]]*[0-9ivxlcdm]+)[[:space:]_.:-]*//I')
+    fi
+
+    # 3. Clean common promotional noise and outro text
+    CH_TITLE=$(echo "$CH_TITLE" | sed -E 's/欢迎关注.*$//; s/感谢您的收听[！!]*$//')
+    CH_TITLE="$(echo "$CH_TITLE" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    [[ -z "$CH_TITLE" ]] && CH_TITLE="$NAME"
 
     # Get duration using ffprobe
     DUR=$("$FFPROBE_BIN" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$FILE" 2>/dev/null || echo "0")
@@ -213,8 +232,13 @@ else
     )
 fi
 
+AUDIO_CODEC="aac"
+if [[ "$(uname -s)" == "Darwin" ]] && "$FFMPEG_BIN" -encoders 2>/dev/null | grep -q "aac_at"; then
+    AUDIO_CODEC="aac_at"
+fi
+
 FFMPEG_CMD+=(
-    -c:a aac -b:a "$BITRATE" -ar 44100 -ac 2
+    -c:a "$AUDIO_CODEC" -b:a "$BITRATE" -ar 44100 -ac 2
     -metadata:s:a:0 language=zho
     -movflags +faststart+disable_chpl
     -movie_timescale 1000

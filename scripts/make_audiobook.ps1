@@ -22,7 +22,8 @@ param(
     [string]$Year = "2026",
     [string]$Publisher = "",
     [string]$Summary = "",
-    [string]$Bitrate = "96k"
+    [string]$Bitrate = "96k",
+    [switch]$StripChapterPrefix = $false
 )
 
 # Set UTF-8 encoding for console output
@@ -103,7 +104,20 @@ $concatLines = @()
 $index = 1
 
 foreach ($file in $files) {
-    $chTitle = $file.BaseName -replace '^\d+[\s._\-:]+', ''
+    $name = $file.BaseName
+    # 1. Check if leading file sequence number precedes a chapter indicator (e.g. 10.第5集, 10第5集, 01 Chapter 1)
+    if ($name -match '^\s*\d+[\s._\-:]*(?=(第\s*[0-9一二三四五六七八九十百千万零两]+\s*[集章节卷部篇回话节讲期]|Chapter|Episode|Part|Section))') {
+        $chTitle = $name -replace '^\s*\d+[\s._\-:]*', ''
+    } else {
+        $chTitle = $name -replace '^\s*\d+[\s._\-:]+', ''
+    }
+    # 2. Optionally strip chapter prefix
+    if ($StripChapterPrefix) {
+        $chTitle = $chTitle -replace '^(第\s*[0-9一二三四五六七八九十百千万零两]+\s*[集章节卷部篇回话节讲期]|Chapter\s*[0-9ivxlcdm]+|Episode\s*[0-9]+|Part\s*[0-9ivxlcdm]+|Section\s*[0-9ivxlcdm]+)[\s._\-:]*', ''
+    }
+    # 3. Clean common promotional noise and outro text
+    $chTitle = $chTitle -replace '欢迎关注.*$', '' -replace '感谢您的收听[！!]*$', ''
+    $chTitle = $chTitle.Trim()
     if (-not $chTitle) { $chTitle = $file.BaseName }
 
     # Call ffprobe

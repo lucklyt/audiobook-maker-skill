@@ -201,11 +201,40 @@ def escape_ffmeta(text):
     text = text.replace('\n', '\\\n')
     return text
 
-def clean_chapter_title(filename):
-    """Generate a clean chapter title from filename."""
+CHAPTER_INDICATOR_PATTERN = re.compile(
+    r'^(?:第\s*[0-9一二三四五六七八九十百千万零两]+\s*[集章节卷部篇回话节讲期]|chapter\s*[0-9ivxlcdm]+|ep(?:isode)?\s*\.?\s*[0-9]+|part\s*[0-9ivxlcdm]+|section\s*[0-9ivxlcdm]+)',
+    re.IGNORECASE
+)
+
+def clean_chapter_title(filename, strip_chapter_prefix=False):
+    """
+    Generate a clean chapter title from filename.
+    1. If a file sequence number is followed by a chapter indicator
+       (e.g. '10.第5集 去红都的道路', '10第5集 去红都的道路', '01 - Chapter 1 Intro'),
+       automatically strip the redundant file sequence number prefix.
+    2. If strip_chapter_prefix=True, also strip the chapter indicator itself (e.g. '第5集 ' -> '').
+    3. Clean common promotional slogans and outro text.
+    """
     name = Path(filename).stem
-    cleaned = re.sub(r'^\s*0*\d+[\s._\-–—:：]+', '', name)
-    return cleaned if cleaned.strip() else name
+    orig = name
+
+    # Check if leading file sequence number precedes a chapter indicator (with or without delimiter)
+    m = re.match(r'^\s*0*\d+[\s._\-–—:：]*(?=' + CHAPTER_INDICATOR_PATTERN.pattern[1:] + ')', name, re.IGNORECASE)
+    if m:
+        name = name[m.end():].strip()
+    else:
+        # Standard cleaning: strip leading number followed by delimiter
+        name = re.sub(r'^\s*0*\d+[\s._\-–—:：]+', '', name)
+
+    # Optionally strip the chapter indicator itself
+    if strip_chapter_prefix:
+        name = re.sub(r'^(?:第\s*[0-9一二三四五六七八九十百千万零两]+\s*[集章节卷部篇回话节讲期]|chapter\s*[0-9ivxlcdm]+|ep(?:isode)?\s*\.?\s*[0-9]+|part\s*[0-9ivxlcdm]+|section\s*[0-9ivxlcdm]+)[\s._\-–—:：]*', '', name, flags=re.IGNORECASE)
+
+    # Clean promotional and outro noise
+    name = re.sub(r'欢迎关注.*$', '', name)
+    name = re.sub(r'感谢您的收听[！!]*$', '', name)
+    name = name.strip()
+    return name if name else orig
 
 def make_audiobook(
     audio_files,
@@ -220,7 +249,8 @@ def make_audiobook(
     summary="",
     chapter_titles=None,
     bitrate="96k",
-    input_dir=None
+    input_dir=None,
+    strip_chapter_prefix=False
 ):
     ffmpeg_bin, ffprobe_bin = find_or_install_ffmpeg()
     output_path = Path(output_path).resolve()
@@ -242,7 +272,7 @@ def make_audiobook(
         if chapter_titles and i < len(chapter_titles) and chapter_titles[i]:
             ch_title = chapter_titles[i]
         else:
-            ch_title = clean_chapter_title(file_path)
+            ch_title = clean_chapter_title(file_path, strip_chapter_prefix=strip_chapter_prefix)
 
         chapters.append({
             'index': i + 1,
@@ -337,8 +367,18 @@ def make_audiobook(
                 '-map_chapters', '1'
             ])
 
+        # Select optimal AAC encoder (aac_at AudioToolbox hardware encoder on macOS for 2.5x speed)
+        audio_codec = 'aac'
+        if platform.system() == "Darwin":
+            try:
+                probe_res = subprocess.run([ffmpeg_bin, '-encoders'], capture_output=True, text=True)
+                if 'aac_at' in probe_res.stdout:
+                    audio_codec = 'aac_at'
+            except Exception:
+                pass
+
         cmd.extend([
-            '-c:a', 'aac',
+            '-c:a', audio_codec,
             '-b:a', bitrate,
             '-ar', '44100',
             '-ac', '2',
@@ -430,6 +470,7 @@ def main():
     parser.add_argument('--summary', '-s', default="", help="内容简介")
     parser.add_argument('--bitrate', '-b', default="96k", help="音频码率 (默认 96k)")
     parser.add_argument('--chapter-titles', nargs='+', help="自定义章节标题列表")
+    parser.add_argument('--strip-chapter-prefix', action='store_true', help="剥离第x集/Chapter x等章节标识，仅保留纯章节名")
     parser.add_argument('--inspect', help="检查已生成的 M4B 文件结构")
 
     args = parser.parse_args()
@@ -474,7 +515,8 @@ def main():
         summary=args.summary,
         chapter_titles=args.chapter_titles,
         bitrate=args.bitrate,
-        input_dir=args.input_dir
+        input_dir=args.input_dir,
+        strip_chapter_prefix=args.strip_chapter_prefix
     )
 
 if __name__ == '__main__':

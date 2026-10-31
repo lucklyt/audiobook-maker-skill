@@ -17,6 +17,7 @@
 - **🌐 智能元数据与封面全网搜刮**：若缺失封面或书籍信息，Agent 会自动联网检索（豆瓣读书、官方发布等），提取作者、出版社、分类、出版年份、内容简介并下载高清封面。
 - **⚙️ 全自动底层引擎就绪**：智能按序探测 `FFmpeg`；在 macOS 上通过 Homebrew 自动补齐，在 Windows 上通过 WinGet/Scoop 自动补齐，Linux 自动调用包管理器。
 - **🎛️ Apple 标准 QuickTime 章节**：采用 `TIMEBASE=1/1000` 毫秒级时间轴，生成 `-movflags +faststart+disable_chpl -movie_timescale 1000 -f ipod` 规范的高兼容 M4B，iPhone / iPad / Mac 图书 App 原生秒开。
+- **🏷️ 智能去除冗余序号与纯净章节清洗**：音频文件名若带有 `10.第5集 去红都的道路`、`01第1章 序言`、`01-Chapter 1` 等，自动剥离前置冗余文件序号，避免双重编号；自动清除尾部广告后缀；并支持 `--strip-chapter-prefix` 仅保留纯标题。
 - **💻 真正跨平台与零 Python 运行支持**：不仅支持 Python，还随包提供 **macOS/Linux 纯 Bash (`.sh`)** 和 **Windows 纯 PowerShell (`.ps1`)** 原生脚本，未安装 Python 也能丝滑运行。
 
 ---
@@ -120,6 +121,9 @@ bash scripts/make_audiobook.sh -i "/path/to/audios" -o "/path/to/书名.m4b" -t 
 
 # 模式 3：校验已有 M4B 文件的章节和元数据
 python3 scripts/make_audiobook.py --inspect "/path/to/书名.m4b"
+
+# 模式 4：一键剥离“第x集/Chapter x”等章节号（仅保留纯标题）
+python3 scripts/make_audiobook.py -i "/path/to/audios" -t "书名" --strip-chapter-prefix
 ```
 
 ---
